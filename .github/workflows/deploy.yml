@@ -30,5 +30,3 @@ jobs:
 
       - name: Publish
         run: npm publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}

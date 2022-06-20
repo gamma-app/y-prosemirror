@@ -173,6 +173,22 @@ export const testEmptyParagraph = (_tc) => {
   )
 }
 
+/**
+ * @param {t.TestCase} tc
+ */
+ export const testRestoreRelativePositionRetainsNodeSelection = tc => {
+  const ydoc = new Y.Doc()
+  const view = createNewProsemirrorView(ydoc)
+  view.dispatch(view.state.tr.insert(0, /** @type {any} */ (schema.node('image', { src: '/cool-img' }))))
+  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, 1)))
+  t.assert(view.state.selection instanceof NodeSelection, 'node selection exists')
+
+  view.dispatch(view.state.tr.insert(0, /** @type {any} */ (schema.node('paragraph', undefined, schema.text('123')))))
+  const yxml = ydoc.get('prosemirror')
+  t.assert(yxml.length === 3 && yxml.get(0).length === 1, 'contains one paragraph and one image')
+  t.assert(view.state.selection instanceof NodeSelection, 'node selection is retained')
+}
+
 export const testAddToHistory = (_tc) => {
   const ydoc = new Y.Doc()
   const view = createNewProsemirrorViewWithUndoManager(ydoc)

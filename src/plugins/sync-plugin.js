@@ -179,9 +179,16 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
     const anchor = relativePositionToAbsolutePosition(binding.doc, binding.type, relSel.anchor, binding.mapping)
     const head = relativePositionToAbsolutePosition(binding.doc, binding.type, relSel.head, binding.mapping)
     if (anchor !== null && head !== null) {
-      const selection = relSel.type === 'node'
-        ? NodeSelection.create(tr.doc, Math.min(anchor, head))
-        : TextSelection.create(tr.doc, anchor, head)
+      let selection
+      if (relSel.type === 'node') {
+        try {
+          selection = NodeSelection.create(tr.doc, Math.min(anchor, head))
+        } catch (err) {
+          console.error('restoreRelativeSelection pos:', anchor, head, 'error:', err)
+        }
+      }
+
+      selection = selection || TextSelection.create(tr.doc, anchor, head)
       tr = tr.setSelection(selection)
     }
   }

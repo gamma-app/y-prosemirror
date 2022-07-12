@@ -184,7 +184,7 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
         try {
           selection = NodeSelection.create(tr.doc, Math.min(anchor, head))
         } catch (err) {
-          console.error('restoreRelativeSelection pos:', anchor, head, 'error:', err)
+          console.error('[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error - pos:', anchor, head, 'error:', err)
         }
       }
 

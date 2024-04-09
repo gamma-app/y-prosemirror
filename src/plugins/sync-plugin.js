@@ -701,10 +701,10 @@ const createNodeFromYElement = (
         message: e.message,
         el: JSON.stringify(el),
         attrs: JSON.stringify(attrs),
-        children: JSON.stringify(children),
-      });
+        children: JSON.stringify(children)
+      })
     } catch (_e) {
-      console.error('[@gamma-app/y-prosemirror][sync-plugin] createNodeFromYElement error forming error message:', _e);
+      console.error('[@gamma-app/y-prosemirror][sync-plugin] createNodeFromYElement error forming error message:', _e)
     }
     // an error occured while creating the node. This is probably a result of a concurrent action.
     /** @type {Y.Doc} */ (el.doc).transact((transaction) => {
@@ -747,7 +747,7 @@ const createTextNodesFromYText = (
   } catch (e) {
     console.error('[@gamma-app/y-prosemirror][sync-plugin] createTextNodesFromYText error:', {
       message: e.message,
-      text,
+      text
     });
     // an error occured while creating the node. This is probably a result of a concurrent action.
     /** @type {Y.Doc} */ (text.doc).transact((transaction) => {

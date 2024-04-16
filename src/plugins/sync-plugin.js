@@ -256,14 +256,19 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
         }
       }
 
-      if (selection) {
-        tr.setSelection(selection)
-      } else {
-        const $anchor = tr.doc.resolve(anchor)
-        const $head = tr.doc.resolve(head)
-        const sel = TextSelection.between($anchor, $head)
-        tr.setSelection(sel)
+      try {
+        if (selection) {
+          tr.setSelection(selection)
+        } else {
+          const $anchor = tr.doc.resolve(anchor)
+          const $head = tr.doc.resolve(head)
+          const sel = TextSelection.between($anchor, $head)
+          tr.setSelection(sel)
+        }
+      } catch (err) {
+        console.error('[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error - pos:', anchor, head, 'error:', err)
       }
+      
     }
   }
 }

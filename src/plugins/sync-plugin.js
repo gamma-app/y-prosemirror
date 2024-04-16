@@ -268,7 +268,6 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
       } catch (err) {
         console.error('[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error - pos:', anchor, head, 'error:', err)
       }
-      
     }
   }
 }

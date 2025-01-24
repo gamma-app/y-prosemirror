@@ -259,49 +259,48 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
       // If selection is already created, set it
       try {
         if (selection) {
-          tr.setSelection(selection);
-          return;
+          tr.setSelection(selection)
+          return
         }
       } catch (err) {
         console.error(
-          "[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error - pos:",
+          '[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error - pos:',
           anchor,
           head,
-          "error:",
+          'error:',
           err
-        );
+        )
       }
 
       // If selection is not created, try to create it
       try {
-        const createdSelection = TextSelection.create(tr.doc, anchor, head);
-        tr.setSelection(createdSelection);
-        return;
+        const createdSelection = TextSelection.create(tr.doc, anchor, head)
+        tr.setSelection(createdSelection)
+        return
       } catch (err) {
         console.error(
-          "[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection create error - pos:",
+          '[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection create error - pos:',
           anchor,
           head,
-          "error:",
+          'error:',
           err
-        );
+        )
       }
 
       // Finally, try to create a selection between the anchor and head
       try {
-        const $anchor = tr.doc.resolve(anchor);
-        const $head = tr.doc.resolve(head);
-        const sel = TextSelection.between($anchor, $head);
-        tr.setSelection(sel);
-        return;
+        const $anchor = tr.doc.resolve(anchor)
+        const $head = tr.doc.resolve(head)
+        const sel = TextSelection.between($anchor, $head)
+        tr.setSelection(sel)
       } catch (err) {
         console.error(
-          "[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection between error - pos:",
+          '[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection between error - pos:',
           anchor,
           head,
-          "error:",
+          'error:',
           err
-        );
+        )
       }
     }
   }

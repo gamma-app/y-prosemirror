@@ -2,24 +2,24 @@
  * @module bindings/prosemirror
  */
 
-import { createMutex } from 'lib0/mutex'
-import * as PModel from 'prosemirror-model'
-import { Plugin, NodeSelection, TextSelection } from 'prosemirror-state' // eslint-disable-line
-import * as math from 'lib0/math'
-import * as object from 'lib0/object'
-import * as set from 'lib0/set'
 import { simpleDiff } from 'lib0/diff'
+import * as dom from 'lib0/dom'
+import * as environment from 'lib0/environment'
 import * as error from 'lib0/error'
-import { ySyncPluginKey, yUndoPluginKey } from './keys.js'
+import * as eventloop from 'lib0/eventloop'
+import * as math from 'lib0/math'
+import { createMutex } from 'lib0/mutex'
+import * as object from 'lib0/object'
+import * as random from 'lib0/random'
+import * as set from 'lib0/set'
+import * as PModel from 'prosemirror-model'
+import { NodeSelection, Plugin, TextSelection } from 'prosemirror-state'; // eslint-disable-line
 import * as Y from 'yjs'
 import {
   absolutePositionToRelativePosition,
   relativePositionToAbsolutePosition
 } from '../lib.js'
-import * as random from 'lib0/random'
-import * as environment from 'lib0/environment'
-import * as dom from 'lib0/dom'
-import * as eventloop from 'lib0/eventloop'
+import { ySyncPluginKey, yUndoPluginKey } from './keys.js'
 
 /**
  * @param {Y.Item} item
@@ -256,17 +256,51 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
         }
       }
 
+      // If selection is already created, set it
       try {
         if (selection) {
           tr.setSelection(selection)
-        } else {
-          const $anchor = tr.doc.resolve(anchor)
-          const $head = tr.doc.resolve(head)
-          const sel = TextSelection.between($anchor, $head)
-          tr.setSelection(sel)
+          return
         }
       } catch (err) {
-        console.error('[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error - pos:', anchor, head, 'error:', err)
+        console.error(
+          '[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error - pos:',
+          anchor,
+          head,
+          'error:',
+          err
+        )
+      }
+
+      // If selection is not created, try to create it
+      try {
+        const createdSelection = TextSelection.create(tr.doc, anchor, head)
+        tr.setSelection(createdSelection)
+        return
+      } catch (err) {
+        console.error(
+          '[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection create error - pos:',
+          anchor,
+          head,
+          'error:',
+          err
+        )
+      }
+
+      // Finally, try to create a selection between the anchor and head
+      try {
+        const $anchor = tr.doc.resolve(anchor)
+        const $head = tr.doc.resolve(head)
+        const sel = TextSelection.between($anchor, $head)
+        tr.setSelection(sel)
+      } catch (err) {
+        console.error(
+          '[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection between error - pos:',
+          anchor,
+          head,
+          'error:',
+          err
+        )
       }
     }
   }

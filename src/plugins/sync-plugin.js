@@ -252,10 +252,11 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
         try {
           selection = NodeSelection.create(tr.doc, Math.min(anchor, head))
         } catch (err) {
-          const captureException = window['gammaCaptureException']
+          // @ts-ignore
+          const captureException = window.gammaCaptureException
           if (captureException && typeof captureException === 'function') {
             captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error: ${err}`, {
-              extra: { anchor, head, }
+              extra: { anchor, head }
             })
           }
           console.error('[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error - pos:', anchor, head, 'error:', err)
@@ -269,10 +270,11 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
           return
         }
       } catch (err) {
-        const captureException = window['gammaCaptureException']
+        // @ts-ignore
+        const captureException = window.gammaCaptureException
         if (captureException && typeof captureException === 'function') {
           captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection error: ${err}`, {
-            extra: { anchor, head, }
+            extra: { anchor, head }
           })
         }
         console.error(
@@ -290,10 +292,11 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
         tr.setSelection(createdSelection)
         return
       } catch (err) {
-        const captureException = window['gammaCaptureException']
+        // @ts-ignore
+        const captureException = window.gammaCaptureException
         if (captureException && typeof captureException === 'function') {
           captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection create error: ${err}`, {
-            extra: { anchor, head, }
+            extra: { anchor, head }
           })
         }
         console.error(
@@ -312,10 +315,11 @@ const restoreRelativeSelection = (tr, relSel, binding) => {
         const sel = TextSelection.between($anchor, $head)
         tr.setSelection(sel)
       } catch (err) {
-        const captureException = window['gammaCaptureException']
+        // @ts-ignore
+        const captureException = window.gammaCaptureException
         if (captureException && typeof captureException === 'function') {
           captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection setSelection between error: ${err}`, {
-            extra: { anchor, head, }
+            extra: { anchor, head }
           })
         }
         console.error(
@@ -757,36 +761,38 @@ const createNodeFromYElement = (
     mapping.set(el, node)
     return node
   } catch (e) {
-      try {
-        const attrs = el.getAttributes(snapshot)
-        const message =  e.message
-        const jsonElement =  JSON.stringify(el)
-        const jsonAttrs = JSON.stringify(attrs)
-        const jsonChildren = JSON.stringify(children)
-        const captureException = window['gammaCaptureException']
-        if (captureException && typeof captureException === 'function') {
-          captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error: ${message}`, {
-            extra: {
-              message,
-              el: jsonElement,
-              attrs: jsonAttrs,
-              children: jsonChildren,
-            }
-          })
-        }
-        console.error('[@gamma-app/y-prosemirror][sync-plugin] createNodeFromYElement error:', {
-          message,
-          el: jsonElement,
-          attrs: jsonAttrs,
-          children: jsonChildren
+    try {
+      const attrs = el.getAttributes(snapshot)
+      const message = e.message
+      const jsonElement = JSON.stringify(el)
+      const jsonAttrs = JSON.stringify(attrs)
+      const jsonChildren = JSON.stringify(children)
+      // @ts-ignore
+      const captureException = window.gammaCaptureException
+      if (captureException && typeof captureException === 'function') {
+        captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error: ${message}`, {
+          extra: {
+            message,
+            el: jsonElement,
+            attrs: jsonAttrs,
+            children: jsonChildren
+          }
         })
-      } catch (_e) {
-        const captureException = window['gammaCaptureException']
-        if (captureException && typeof captureException === 'function') {
-          captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error: ${_e}`)
-        }
-        console.error('[@gamma-app/y-prosemirror][sync-plugin] createNodeFromYElement error forming error message:', _e)
       }
+      console.error('[@gamma-app/y-prosemirror][sync-plugin] createNodeFromYElement error:', {
+        message,
+        el: jsonElement,
+        attrs: jsonAttrs,
+        children: jsonChildren
+      })
+    } catch (_e) {
+      // @ts-ignore
+      const captureException = window.gammaCaptureException
+      if (captureException && typeof captureException === 'function') {
+        captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error: ${_e}`)
+      }
+      console.error('[@gamma-app/y-prosemirror][sync-plugin] createNodeFromYElement error forming error message:', _e)
+    }
     // an error occured while creating the node. This is probably a result of a concurrent action.
     /** @type {Y.Doc} */ (el.doc).transact((transaction) => {
       /** @type {Y.Item} */ (el._item).delete(transaction)
@@ -826,12 +832,13 @@ const createTextNodesFromYText = (
       nodes.push(schema.text(delta.insert, marks))
     }
   } catch (e) {
-    const captureException = window['gammaCaptureException']
+    // @ts-ignore
+    const captureException = window.gammaCaptureException
     if (captureException && typeof captureException === 'function') {
       captureException(`[@gamma-app/y-prosemirror][sync-plugin] restoreRelativeSelection NodeSelection error: ${e}`, {
         extra: {
           message: e.message,
-          text,
+          text
         }
       })
     }

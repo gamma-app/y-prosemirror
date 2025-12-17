@@ -58,6 +58,7 @@
   "peerDependencies": {
     "prosemirror-model": "^1.7.1",
     "prosemirror-state": "^1.2.3",
+    "prosemirror-transform": "^1.8.0",
     "prosemirror-view": "^1.9.10",
     "y-protocols": "^1.0.1",
     "yjs": "^13.5.38"
@@ -72,7 +73,7 @@
     "prosemirror-model": "^1.18.1",
     "prosemirror-schema-basic": "^1.2.0",
     "prosemirror-state": "^1.4.1",
-    "prosemirror-transform": "^1.6.0",
+    "prosemirror-transform": "^1.8.0",
     "prosemirror-view": "^1.26.2",
     "rollup": "^2.59.0",
     "standard": "^17.0.0",

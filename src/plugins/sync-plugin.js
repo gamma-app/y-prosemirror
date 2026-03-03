@@ -54,7 +54,7 @@ const safeReplace = ($from, $to, fragment, tr) => {
  * @return {boolean}
  */
 const diffDocs = (source, target, sourcePos, tr) => {
-  const mappedPos = sourcePos === -1 ? { pos: 0, deleted: false } : tr.mapping.mapResult(sourcePos)
+  const mappedPos = sourcePos === -1 ? { pos: 0, deleted: false } : tr.mapping.mapResult(sourcePos, 1)
   if (mappedPos.deleted) return false
   const inter = sourcePos === -1 ? tr.doc : tr.doc.resolve(mappedPos.pos).nodeAfter
   const interSize = sourcePos === -1 ? inter.content.size : inter?.nodeSize ?? 0
@@ -108,7 +108,7 @@ const diffDocs = (source, target, sourcePos, tr) => {
     if (!diffed) {
       // Recompute the mapped position, since the transaction may have since been
       // updated by previous child replacements
-      const mappedPos = sourcePos === -1 ? { pos: 0, deleted: false } : tr.mapping.mapResult(sourcePos)
+      const mappedPos = sourcePos === -1 ? { pos: 0, deleted: false } : tr.mapping.mapResult(sourcePos, 1)
       if (mappedPos.deleted) return false
 
       const inter = sourcePos === -1 ? tr.doc : tr.doc.resolve(mappedPos.pos).nodeAfter
@@ -710,6 +710,8 @@ export class ProsemirrorBinding {
         tr.scrollIntoView()
       }
       this.prosemirrorView.dispatch(tr)
+      this.mapping.clear()
+      updateYFragment(this.doc, this.type, this.prosemirrorView.state.doc, this.mapping)
     })
   }
 

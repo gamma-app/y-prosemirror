@@ -127,6 +127,29 @@ const diffDocs = (source, target, sourcePos, tr) => {
 }
 
 /**
+ * Recursively populate the mapping between Yjs types and ProseMirror nodes.
+ * This assumes the Yjs fragment and ProseMirror node are already in sync.
+ *
+ * @param {Y.XmlFragment} yFragment
+ * @param {PModel.Node} pNode
+ * @param {ProsemirrorMapping} mapping
+ */
+const populateMapping = (yFragment, pNode, mapping) => {
+  mapping.set(yFragment, pNode)
+  const yChildren = yFragment.toArray()
+  const pChildren = normalizePNodeContent(pNode)
+  for (let i = 0; i < yChildren.length && i < pChildren.length; i++) {
+    const yChild = yChildren[i]
+    const pChild = pChildren[i]
+    if (yChild instanceof Y.XmlElement && !(pChild instanceof Array)) {
+      populateMapping(yChild, pChild, mapping)
+    } else if (yChild instanceof Y.XmlText && pChild instanceof Array) {
+      mapping.set(yChild, pChild)
+    }
+  }
+}
+
+/**
  * @param {Y.Item} item
  * @param {Y.Snapshot} [snapshot]
  */
@@ -711,7 +734,7 @@ export class ProsemirrorBinding {
       }
       this.prosemirrorView.dispatch(tr)
       this.mapping.clear()
-      updateYFragment(this.doc, this.type, this.prosemirrorView.state.doc, this.mapping)
+      populateMapping(this.type, this.prosemirrorView.state.doc, this.mapping)
     })
   }
 

@@ -13,13 +13,141 @@ import * as object from 'lib0/object'
 import * as random from 'lib0/random'
 import * as set from 'lib0/set'
 import * as PModel from 'prosemirror-model'
-import { NodeSelection, Plugin, TextSelection } from 'prosemirror-state'; // eslint-disable-line
+import { NodeSelection, Plugin, TextSelection, Transaction } from 'prosemirror-state'; // eslint-disable-line
+import { DocAttrStep } from 'prosemirror-transform'
 import * as Y from 'yjs'
 import {
   absolutePositionToRelativePosition,
   relativePositionToAbsolutePosition
 } from '../lib.js'
 import { ySyncPluginKey, yUndoPluginKey } from './keys.js'
+
+/**
+ * @param {PModel.ResolvedPos} $from
+ * @param {PModel.ResolvedPos} $to
+ * @param {PModel.Fragment} fragment
+ * @param {Transaction} tr
+ * @return {boolean}
+ */
+const safeReplace = ($from, $to, fragment, tr) => {
+  // If we encounter a non-trivial replacement, fail up
+  // and have the parent handle it. Otherwise ProseMirror
+  // will adjust the document in unpredictable ways
+  // to enforce the schema
+  if (!$from.parent.canReplace($from.index(), $to.index(), fragment)) {
+    return false
+  }
+
+  tr.replace(
+    $from.pos,
+    $to.pos,
+    new PModel.Slice(fragment, 0, 0)
+  )
+  return true
+}
+
+/**
+ * @param {PModel.Node | undefined} source
+ * @param {PModel.Node | undefined} target
+ * @param {number} sourcePos
+ * @param {Transaction} tr
+ * @return {boolean}
+ */
+const diffDocs = (source, target, sourcePos, tr) => {
+  const mappedPos = sourcePos === -1 ? { pos: 0, deleted: false } : tr.mapping.mapResult(sourcePos, 1)
+  if (mappedPos.deleted) return false
+  const inter = sourcePos === -1 ? tr.doc : tr.doc.resolve(mappedPos.pos).nodeAfter
+  const interSize = sourcePos === -1 ? inter.content.size : inter?.nodeSize ?? 0
+
+  if (!source) {
+    tr.insert(mappedPos.pos, target)
+    return true
+  }
+
+  if (!target) {
+    tr.delete(mappedPos.pos, mappedPos.pos + inter.nodeSize)
+    return true
+  }
+
+  if (source.type !== target.type) {
+    const $from = tr.doc.resolve(mappedPos.pos)
+    const $to = tr.doc.resolve(mappedPos.pos + interSize)
+    const fragment = PModel.Fragment.from(target)
+
+    return safeReplace($from, $to, fragment, tr)
+  }
+
+  if (!source.isText && !source.hasMarkup(target.type, target.attrs, target.marks)) {
+    if (sourcePos === -1) {
+      for (const [attr, value] of Object.entries(target.attrs)) {
+        tr.step(new DocAttrStep(attr, value))
+      }
+    } else {
+      tr.setNodeMarkup(
+        mappedPos.pos,
+        target.type,
+        target.attrs,
+        target.marks
+      )
+    }
+  }
+
+  if ((source.isLeaf || target.isLeaf) && !source.eq(target)) {
+    tr.replace(
+      mappedPos.pos,
+      mappedPos.pos + interSize,
+      new PModel.Slice(PModel.Fragment.from(target), 0, 0)
+    )
+    return true
+  }
+
+  const childCount = Math.max(source.childCount, target.childCount)
+  let childSourcePos = sourcePos === -1 ? 0 : sourcePos + (source.isLeaf ? 0 : 1)
+  for (let i = 0; i < childCount; i++) {
+    const diffed = diffDocs(source.maybeChild(i), target.maybeChild(i), childSourcePos, tr)
+    if (!diffed) {
+      // Recompute the mapped position, since the transaction may have since been
+      // updated by previous child replacements
+      const mappedPos = sourcePos === -1 ? { pos: 0, deleted: false } : tr.mapping.mapResult(sourcePos, 1)
+      if (mappedPos.deleted) return false
+
+      const inter = sourcePos === -1 ? tr.doc : tr.doc.resolve(mappedPos.pos).nodeAfter
+      const interSize = sourcePos === -1 ? inter.content.size : inter?.nodeSize ?? 0
+
+      const $from = tr.doc.resolve(mappedPos.pos)
+      const $to = tr.doc.resolve(mappedPos.pos + interSize)
+      const fragment = PModel.Fragment.from(target)
+
+      return safeReplace($from, $to, fragment, tr)
+    }
+    childSourcePos += source.maybeChild(i)?.nodeSize ?? 0
+  }
+
+  return true
+}
+
+/**
+ * Recursively populate the mapping between Yjs types and ProseMirror nodes.
+ * This assumes the Yjs fragment and ProseMirror node are already in sync.
+ *
+ * @param {Y.XmlFragment} yFragment
+ * @param {PModel.Node} pNode
+ * @param {ProsemirrorMapping} mapping
+ */
+const populateMapping = (yFragment, pNode, mapping) => {
+  mapping.set(yFragment, pNode)
+  const yChildren = yFragment.toArray()
+  const pChildren = normalizePNodeContent(pNode)
+  for (let i = 0; i < yChildren.length && i < pChildren.length; i++) {
+    const yChild = yChildren[i]
+    const pChild = pChildren[i]
+    if (yChild instanceof Y.XmlElement && !(pChild instanceof Array)) {
+      populateMapping(yChild, pChild, mapping)
+    } else if (yChild instanceof Y.XmlText && pChild instanceof Array) {
+      mapping.set(yChild, pChild)
+    }
+  }
+}
 
 /**
  * @param {Y.Item} item
@@ -590,11 +718,13 @@ export class ProsemirrorBinding {
         )
       ).filter((n) => n !== null)
       // @ts-ignore
-      let tr = this._tr.replace(
+      const target = this._tr.replace(
         0,
         this.prosemirrorView.state.doc.content.size,
         new PModel.Slice(PModel.Fragment.from(fragmentContent), 0, 0)
-      )
+      ).doc
+      let tr = this._tr
+      diffDocs(this.prosemirrorView.state.doc, target, -1, tr)
       restoreRelativeSelection(tr, this.beforeTransactionSelection, this)
       tr = tr.setMeta(ySyncPluginKey, { isChangeOrigin: true, isUndoRedoOperation: transaction.origin instanceof Y.UndoManager })
       if (
@@ -603,6 +733,8 @@ export class ProsemirrorBinding {
         tr.scrollIntoView()
       }
       this.prosemirrorView.dispatch(tr)
+      this.mapping.clear()
+      populateMapping(this.type, this.prosemirrorView.state.doc, this.mapping)
     })
   }
 

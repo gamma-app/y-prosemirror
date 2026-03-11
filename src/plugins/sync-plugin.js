@@ -725,6 +725,8 @@ export class ProsemirrorBinding {
       ).doc
       let tr = this._tr
       diffDocs(this.prosemirrorView.state.doc, target, -1, tr)
+      this.mapping.clear()
+      populateMapping(this.type, tr.doc, this.mapping)
       restoreRelativeSelection(tr, this.beforeTransactionSelection, this)
       tr = tr.setMeta(ySyncPluginKey, { isChangeOrigin: true, isUndoRedoOperation: transaction.origin instanceof Y.UndoManager })
       if (
@@ -733,8 +735,6 @@ export class ProsemirrorBinding {
         tr.scrollIntoView()
       }
       this.prosemirrorView.dispatch(tr)
-      this.mapping.clear()
-      populateMapping(this.type, this.prosemirrorView.state.doc, this.mapping)
     })
   }
 

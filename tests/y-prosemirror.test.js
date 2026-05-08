@@ -357,9 +357,8 @@ const cardSchema = new Schema({
 })
 
 /**
- * Regression for https://github.com/gamma-app/y-prosemirror/pull/24 — Y
- * identity attrs (`id`, `itemId`) on existing elements must survive the
- * middle-diff fallback path that rewrote them to neighbors' ids in prod.
+ * Identity attrs (`id`, `itemId`) on existing Y elements are preserved by
+ * `updateYFragment`; non-identity attrs are still updated.
  *
  * @param {t.TestCase} _tc
  */
@@ -387,7 +386,7 @@ export const testIdentityAttrsPreservedOnExistingYElement = (_tc) => {
 }
 
 /**
- * Inverse of the above: confirms the patch does not break clean inserts.
+ * Identity attrs are assigned on fresh Y elements (no existing value).
  *
  * @param {t.TestCase} _tc
  */

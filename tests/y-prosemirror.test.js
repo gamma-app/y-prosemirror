@@ -20,7 +20,9 @@ import { EditorState, Plugin, TextSelection, NodeSelection } from 'prosemirror-s
 import { EditorView } from 'prosemirror-view'
 import * as basicSchema from 'prosemirror-schema-basic'
 import { findWrapping } from 'prosemirror-transform'
+import { Schema } from 'prosemirror-model'
 import { schema as complexSchema } from './complexSchema.js'
+import { updateYFragment } from '../src/plugins/sync-plugin.js'
 
 const schema = /** @type {any} */ (basicSchema.schema)
 
@@ -335,6 +337,75 @@ export const testAddToHistoryIgnore = (_tc) => {
       yxml.get(0).toString() === '<paragraph>abc</paragraph>',
     'insertion (1) was undone'
   )
+}
+
+const cardSchema = new Schema({
+  nodes: {
+    doc: { content: 'card+' },
+    card: {
+      attrs: {
+        id: { default: null },
+        itemId: { default: null },
+        foo: { default: null }
+      },
+      content: 'inline*',
+      parseDOM: [{ tag: 'card' }],
+      toDOM: () => ['card', 0]
+    },
+    text: { group: 'inline' }
+  }
+})
+
+/**
+ * Identity attrs (`id`, `itemId`) on existing Y elements are preserved by
+ * `updateYFragment`; non-identity attrs are still updated.
+ *
+ * @param {t.TestCase} _tc
+ */
+export const testIdentityAttrsPreservedOnExistingYElement = (_tc) => {
+  const ydoc = new Y.Doc()
+  const yFrag = ydoc.get('test', Y.XmlFragment)
+  const yCard = new Y.XmlElement('card')
+  yCard.setAttribute('id', 'y-original-id')
+  yCard.setAttribute('itemId', 'y-original-itemid')
+  yCard.setAttribute('foo', 'y-foo')
+  yFrag.insert(0, [yCard])
+
+  const pmCard = cardSchema.node('card', {
+    id: 'pm-cascading-id',
+    itemId: 'pm-cascading-itemid',
+    foo: 'pm-foo'
+  })
+  const pmDoc = cardSchema.node('doc', null, [pmCard])
+
+  updateYFragment(ydoc, yFrag, pmDoc, new Map())
+
+  t.assert(yCard.getAttribute('id') === 'y-original-id', 'id preserved on existing Y element')
+  t.assert(yCard.getAttribute('itemId') === 'y-original-itemid', 'itemId preserved on existing Y element')
+  t.assert(yCard.getAttribute('foo') === 'pm-foo', 'non-identity attr is updated')
+}
+
+/**
+ * Identity attrs are assigned on fresh Y elements (no existing value).
+ *
+ * @param {t.TestCase} _tc
+ */
+export const testIdentityAttrsAssignedOnFreshYElement = (_tc) => {
+  const ydoc = new Y.Doc()
+  const yFrag = ydoc.get('test', Y.XmlFragment)
+  const yCard = new Y.XmlElement('card')
+  yFrag.insert(0, [yCard])
+
+  const pmCard = cardSchema.node('card', {
+    id: 'fresh-id',
+    itemId: 'fresh-itemid'
+  })
+  const pmDoc = cardSchema.node('doc', null, [pmCard])
+
+  updateYFragment(ydoc, yFrag, pmDoc, new Map())
+
+  t.assert(yCard.getAttribute('id') === 'fresh-id', 'id assigned on fresh Y element')
+  t.assert(yCard.getAttribute('itemId') === 'fresh-itemid', 'itemId assigned on fresh Y element')
 }
 
 const createNewProsemirrorViewWithSchema = (y, schema, undoManager = false) => {

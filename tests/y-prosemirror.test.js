@@ -339,8 +339,6 @@ export const testAddToHistoryIgnore = (_tc) => {
   )
 }
 
-// Minimal schema with stable identity attrs (`id`, `itemId`) on a `card` node,
-// modeling Gamma's editor schema for the regression tests below.
 const cardSchema = new Schema({
   nodes: {
     doc: { content: 'card+' },
@@ -359,14 +357,9 @@ const cardSchema = new Schema({
 })
 
 /**
- * Regression for https://github.com/gamma-app/y-prosemirror/pull/24.
- *
- * When `updateYFragment`'s prefix/suffix anchor walks both fail and the
- * middle-diff loop pairs a Y XmlElement with a different PM node by
- * `nodeName` only, the recursive call must NOT overwrite identity attrs
- * (`id`, `itemId`) on the existing Y element. Doing so produced a cascade
- * corruption in production where stable card ids were rewritten to neighbors'
- * ids on every subsequent local edit.
+ * Regression for https://github.com/gamma-app/y-prosemirror/pull/24 — Y
+ * identity attrs (`id`, `itemId`) on existing elements must survive the
+ * middle-diff fallback path that rewrote them to neighbors' ids in prod.
  *
  * @param {t.TestCase} _tc
  */
@@ -394,10 +387,7 @@ export const testIdentityAttrsPreservedOnExistingYElement = (_tc) => {
 }
 
 /**
- * Companion to the above: identity attrs MUST still be assigned on fresh Y
- * elements (no existing value). The early-skip in the patch is gated on
- * `yDomAttrs[key] !== undefined`, so clean inserts must continue to receive
- * their initial id assignment.
+ * Inverse of the above: confirms the patch does not break clean inserts.
  *
  * @param {t.TestCase} _tc
  */

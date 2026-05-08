@@ -20,7 +20,9 @@ import { EditorState, Plugin, TextSelection, NodeSelection } from 'prosemirror-s
 import { EditorView } from 'prosemirror-view'
 import * as basicSchema from 'prosemirror-schema-basic'
 import { findWrapping } from 'prosemirror-transform'
+import { Schema } from 'prosemirror-model'
 import { schema as complexSchema } from './complexSchema.js'
+import { updateYFragment } from '../src/plugins/sync-plugin.js'
 
 const schema = /** @type {any} */ (basicSchema.schema)
 
@@ -335,6 +337,86 @@ export const testAddToHistoryIgnore = (_tc) => {
       yxml.get(0).toString() === '<paragraph>abc</paragraph>',
     'insertion (1) was undone'
   )
+}
+
+// Minimal schema with stable identity attrs (`id`, `itemId`) on a `card` node,
+// modeling Gamma's editor schema for the regression tests below.
+const cardSchema = new Schema({
+  nodes: {
+    doc: { content: 'card+' },
+    card: {
+      attrs: {
+        id: { default: null },
+        itemId: { default: null },
+        foo: { default: null }
+      },
+      content: 'inline*',
+      parseDOM: [{ tag: 'card' }],
+      toDOM: () => ['card', 0]
+    },
+    text: { group: 'inline' }
+  }
+})
+
+/**
+ * Regression for https://github.com/gamma-app/y-prosemirror/pull/24.
+ *
+ * When `updateYFragment`'s prefix/suffix anchor walks both fail and the
+ * middle-diff loop pairs a Y XmlElement with a different PM node by
+ * `nodeName` only, the recursive call must NOT overwrite identity attrs
+ * (`id`, `itemId`) on the existing Y element. Doing so produced a cascade
+ * corruption in production where stable card ids were rewritten to neighbors'
+ * ids on every subsequent local edit.
+ *
+ * @param {t.TestCase} _tc
+ */
+export const testIdentityAttrsPreservedOnExistingYElement = (_tc) => {
+  const ydoc = new Y.Doc()
+  const yFrag = ydoc.get('test', Y.XmlFragment)
+  const yCard = new Y.XmlElement('card')
+  yCard.setAttribute('id', 'y-original-id')
+  yCard.setAttribute('itemId', 'y-original-itemid')
+  yCard.setAttribute('foo', 'y-foo')
+  yFrag.insert(0, [yCard])
+
+  const pmCard = cardSchema.node('card', {
+    id: 'pm-cascading-id',
+    itemId: 'pm-cascading-itemid',
+    foo: 'pm-foo'
+  })
+  const pmDoc = cardSchema.node('doc', null, [pmCard])
+
+  updateYFragment(ydoc, yFrag, pmDoc, new Map())
+
+  t.assert(yCard.getAttribute('id') === 'y-original-id', 'id preserved on existing Y element')
+  t.assert(yCard.getAttribute('itemId') === 'y-original-itemid', 'itemId preserved on existing Y element')
+  t.assert(yCard.getAttribute('foo') === 'pm-foo', 'non-identity attr is updated')
+}
+
+/**
+ * Companion to the above: identity attrs MUST still be assigned on fresh Y
+ * elements (no existing value). The early-skip in the patch is gated on
+ * `yDomAttrs[key] !== undefined`, so clean inserts must continue to receive
+ * their initial id assignment.
+ *
+ * @param {t.TestCase} _tc
+ */
+export const testIdentityAttrsAssignedOnFreshYElement = (_tc) => {
+  const ydoc = new Y.Doc()
+  const yFrag = ydoc.get('test', Y.XmlFragment)
+  const yCard = new Y.XmlElement('card')
+  yFrag.insert(0, [yCard])
+
+  const pmCard = cardSchema.node('card', {
+    id: 'fresh-id',
+    itemId: 'fresh-itemid'
+  })
+  const pmDoc = cardSchema.node('doc', null, [pmCard])
+
+  updateYFragment(ydoc, yFrag, pmDoc, new Map())
+
+  t.assert(yCard.getAttribute('id') === 'fresh-id', 'id assigned on fresh Y element')
+  t.assert(yCard.getAttribute('itemId') === 'fresh-itemid', 'itemId assigned on fresh Y element')
 }
 
 const createNewProsemirrorViewWithSchema = (y, schema, undoManager = false) => {

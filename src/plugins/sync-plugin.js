@@ -1198,12 +1198,6 @@ export const updateYFragment = (y, yDomFragment, pNode, mapping) => {
     for (const key in pAttrs) {
       if (pAttrs[key] !== null) {
         if (yDomAttrs[key] !== pAttrs[key] && key !== 'ychange') {
-          if (
-            (key === 'id' || key === 'itemId') &&
-            yDomAttrs[key] !== undefined
-          ) {
-            continue
-          }
           yDomFragment.setAttribute(key, pAttrs[key])
         }
       } else {

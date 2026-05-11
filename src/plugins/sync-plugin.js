@@ -718,15 +718,26 @@ export class ProsemirrorBinding {
         )
       ).filter((n) => n !== null)
       // @ts-ignore
-      const target = this._tr.replace(
+      const _tr = this._tr.replace(
         0,
         this.prosemirrorView.state.doc.content.size,
         new PModel.Slice(PModel.Fragment.from(fragmentContent), 0, 0)
-      ).doc
+      )
       let tr = this._tr
-      diffDocs(this.prosemirrorView.state.doc, target, -1, tr)
-      this.mapping.clear()
-      populateMapping(this.type, tr.doc, this.mapping)
+      diffDocs(this.prosemirrorView.state.doc, _tr.doc, -1, tr)
+      // Bail out if diffDocs produced an incorrect document
+      if (tr.doc.eq(_tr.doc)) {
+        this.mapping.clear()
+        populateMapping(this.type, tr.doc, this.mapping)
+      } else {
+        console.error(
+          '[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document',
+          this.prosemirrorView.state.doc.toJSON(),
+          _tr.doc.toJSON(),
+          tr.doc.toJSON()
+        )
+        tr = _tr
+      }
       restoreRelativeSelection(tr, this.beforeTransactionSelection, this)
       tr = tr.setMeta(ySyncPluginKey, { isChangeOrigin: true, isUndoRedoOperation: transaction.origin instanceof Y.UndoManager })
       if (

@@ -730,6 +730,12 @@ export class ProsemirrorBinding {
         this.mapping.clear()
         populateMapping(this.type, tr.doc, this.mapping)
       } else {
+        console.error(
+          '[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document',
+          this.prosemirrorView.state.doc.toJSON(),
+          _tr.doc.toJSON(),
+          tr.doc.toJSON()
+        )
         tr = _tr
       }
       restoreRelativeSelection(tr, this.beforeTransactionSelection, this)

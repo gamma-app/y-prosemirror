@@ -730,12 +730,15 @@ export class ProsemirrorBinding {
         this.mapping.clear()
         populateMapping(this.type, tr.doc, this.mapping)
       } else {
-        console.error(
-          '[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document',
-          this.prosemirrorView.state.doc.toJSON(),
-          _tr.doc.toJSON(),
-          tr.doc.toJSON()
-        )
+        try {
+          console.error('[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document:', {
+            before: JSON.stringify(this.prosemirrorView.state.doc.toJSON()),
+            expected: JSON.stringify(_tr.doc.toJSON()),
+            actual: JSON.stringify(tr.doc.toJSON())
+          })
+        } catch (_e) {
+          console.error('[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document; error forming error message:', _e)
+        }
         tr = _tr
       }
       restoreRelativeSelection(tr, this.beforeTransactionSelection, this)

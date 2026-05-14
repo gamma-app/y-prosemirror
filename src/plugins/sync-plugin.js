@@ -731,10 +731,11 @@ export class ProsemirrorBinding {
         populateMapping(this.type, tr.doc, this.mapping)
       } else {
         try {
+          const truncate = (s) => s.length > 4000 ? s.slice(0, 4000) + `…[truncated ${s.length - 4000} chars]` : s
           console.error('[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document:', {
-            before: JSON.stringify(this.prosemirrorView.state.doc.toJSON()),
-            expected: JSON.stringify(_tr.doc.toJSON()),
-            actual: JSON.stringify(tr.doc.toJSON())
+            before: truncate(JSON.stringify(this.prosemirrorView.state.doc.toJSON())),
+            expected: truncate(JSON.stringify(_tr.doc.toJSON())),
+            actual: truncate(JSON.stringify(tr.doc.toJSON()))
           })
         } catch (_e) {
           console.error('[@gamma-app/y-prosemirror][sync-plugin] diffDocs produced an incorrect document; error forming error message:', _e)

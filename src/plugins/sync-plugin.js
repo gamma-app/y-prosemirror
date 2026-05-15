@@ -166,6 +166,14 @@ export const isVisible = (item, snapshot) =>
  */
 
 /**
+ * Proof that a Y type and ProseMirror node represent the same logical content.
+ * Middle-diff index alignment is not sufficient proof because mutating an
+ * existing Y type also mutates its CRDT identity.
+ *
+ * @typedef {{ kind: 'root' | 'mapping' | 'equality' | 'unique-markup' | 'unique-text' }} PairProof
+ */
+
+/**
  * @typedef {Object} ColorDef
  * @property {string} ColorDef.light
  * @property {string} ColorDef.dark
@@ -1086,6 +1094,120 @@ const mappedIdentity = (mapped, pcontent) =>
 
 /**
  * @param {Y.XmlElement} ytype
+ * @param {any|Array<any>} pcontent
+ * @return {boolean}
+ */
+const sameMarkup = (ytype, pcontent) =>
+  !(pcontent instanceof Array) &&
+  matchNodeName(ytype, pcontent) &&
+  equalAttrs(ytype.getAttributes(), pcontent.attrs)
+
+/**
+ * @param {Y.XmlElement|Y.XmlText|Y.XmlHook} ytype
+ * @param {any|Array<any>} pcontent
+ * @param {ProsemirrorMapping} mapping
+ * @return {PairProof|null}
+ */
+const getPairProof = (ytype, pcontent, mapping) => {
+  if (mappedIdentity(mapping.get(ytype), pcontent)) {
+    return { kind: 'mapping' }
+  }
+  if (equalYTypePNode(ytype, pcontent)) {
+    return { kind: 'equality' }
+  }
+  return null
+}
+
+/**
+ * @param {Y.XmlElement} ytype
+ * @param {any|Array<any>} pcontent
+ * @param {Array<Y.XmlElement|Y.XmlText|Y.XmlHook>} yChildren
+ * @param {NormalizedPNodeContent} pChildren
+ * @param {number} left
+ * @param {number} right
+ * @return {PairProof|null}
+ */
+const getUniqueMarkupProof = (
+  ytype,
+  pcontent,
+  yChildren,
+  pChildren,
+  left,
+  right
+) => {
+  if (
+    pcontent instanceof Array ||
+    !sameMarkup(ytype, pcontent)
+  ) {
+    return null
+  }
+  const yWindowEnd = yChildren.length - right
+  const pWindowEnd = pChildren.length - right
+  let yMatchCnt = 0
+  let pMatchCnt = 0
+  for (let i = left; i < yWindowEnd && yMatchCnt < 2; i++) {
+    const yChild = yChildren[i]
+    if (yChild instanceof Y.XmlElement && sameMarkup(yChild, pcontent)) {
+      yMatchCnt++
+    }
+  }
+  for (let i = left; i < pWindowEnd && pMatchCnt < 2; i++) {
+    const pChild = pChildren[i]
+    if (sameMarkup(ytype, pChild)) {
+      pMatchCnt++
+    }
+  }
+  return yMatchCnt === 1 && pMatchCnt === 1
+    ? { kind: 'unique-markup' }
+    : null
+}
+
+/**
+ * @param {Y.XmlText} ytype
+ * @param {Array<any>} pcontent
+ * @param {Array<Y.XmlElement|Y.XmlText|Y.XmlHook>} yChildren
+ * @param {NormalizedPNodeContent} pChildren
+ * @param {number} left
+ * @param {number} right
+ * @param {ProsemirrorMapping} mapping
+ * @return {PairProof|null}
+ */
+const getTextProof = (
+  ytype,
+  pcontent,
+  yChildren,
+  pChildren,
+  left,
+  right,
+  mapping
+) => {
+  if (mappedIdentity(mapping.get(ytype), pcontent)) {
+    return { kind: 'mapping' }
+  }
+  if (equalYTextPText(ytype, pcontent)) {
+    return { kind: 'equality' }
+  }
+  const yWindowEnd = yChildren.length - right
+  const pWindowEnd = pChildren.length - right
+  let yTextCnt = 0
+  let pTextCnt = 0
+  for (let i = left; i < yWindowEnd && yTextCnt < 2; i++) {
+    if (yChildren[i] instanceof Y.XmlText) {
+      yTextCnt++
+    }
+  }
+  for (let i = left; i < pWindowEnd && pTextCnt < 2; i++) {
+    if (pChildren[i] instanceof Array) {
+      pTextCnt++
+    }
+  }
+  return yTextCnt === 1 && pTextCnt === 1
+    ? { kind: 'unique-text' }
+    : null
+}
+
+/**
+ * @param {Y.XmlElement} ytype
  * @param {PModel.Node} pnode
  * @param {ProsemirrorMapping} mapping
  * @return {{ foundMappedChild: boolean, equalityFactor: number }}
@@ -1193,17 +1315,21 @@ const marksToAttributes = (marks) => {
  * @param {Y.XmlFragment} yDomFragment
  * @param {any} pNode
  * @param {ProsemirrorMapping} mapping
+ * @param {PairProof|null} proof
  */
-export const updateYFragment = (y, yDomFragment, pNode, mapping) => {
+export const updateYFragment = (y, yDomFragment, pNode, mapping, proof = { kind: 'root' }) => {
   if (
     yDomFragment instanceof Y.XmlElement &&
     yDomFragment.nodeName !== pNode.type.name
   ) {
     throw new Error('node name mismatch!')
   }
-  mapping.set(yDomFragment, pNode)
-  // update attributes
-  if (yDomFragment instanceof Y.XmlElement) {
+  if (proof !== null) {
+    mapping.set(yDomFragment, pNode)
+  }
+  // update attributes only after proving that this existing Y type is paired
+  // with the same logical ProseMirror node.
+  if (proof !== null && yDomFragment instanceof Y.XmlElement) {
     const yDomAttrs = yDomFragment.getAttributes()
     const pAttrs = pNode.attrs
     for (const key in pAttrs) {
@@ -1264,15 +1390,50 @@ export const updateYFragment = (y, yDomFragment, pNode, mapping) => {
       const rightY = yChildren[yChildCnt - right - 1]
       const rightP = pChildren[pChildCnt - right - 1]
       if (leftY instanceof Y.XmlText && leftP instanceof Array) {
-        if (!equalYTextPText(leftY, leftP)) {
+        const textProof = getTextProof(
+          leftY,
+          leftP,
+          yChildren,
+          pChildren,
+          left,
+          right,
+          mapping
+        )
+        if (textProof !== null && !equalYTextPText(leftY, leftP)) {
           updateYText(leftY, leftP, mapping)
+        } else if (textProof === null) {
+          mapping.delete(yDomFragment.get(left))
+          yDomFragment.delete(left, 1)
+          yDomFragment.insert(left, [
+            createTypeFromTextOrElementNode(leftP, mapping)
+          ])
         }
         left += 1
       } else {
-        let updateLeft = leftY instanceof Y.XmlElement &&
-          matchNodeName(leftY, leftP)
-        let updateRight = rightY instanceof Y.XmlElement &&
-          matchNodeName(rightY, rightP)
+        const leftProof = leftY instanceof Y.XmlElement
+          ? getPairProof(leftY, leftP, mapping) ||
+            getUniqueMarkupProof(
+              leftY,
+              leftP,
+              yChildren,
+              pChildren,
+              left,
+              right
+            )
+          : null
+        const rightProof = rightY instanceof Y.XmlElement
+          ? getPairProof(rightY, rightP, mapping) ||
+            getUniqueMarkupProof(
+              rightY,
+              rightP,
+              yChildren,
+              pChildren,
+              left,
+              right
+            )
+          : null
+        let updateLeft = leftProof !== null
+        let updateRight = rightProof !== null
         if (updateLeft && updateRight) {
           // decide which which element to update
           const equalityLeft = computeChildEqualityFactor(
@@ -1306,7 +1467,8 @@ export const updateYFragment = (y, yDomFragment, pNode, mapping) => {
             y,
             /** @type {Y.XmlFragment} */ (leftY),
             /** @type {PModel.Node} */ (leftP),
-            mapping
+            mapping,
+            leftProof
           )
           left += 1
         } else if (updateRight) {
@@ -1314,7 +1476,8 @@ export const updateYFragment = (y, yDomFragment, pNode, mapping) => {
             y,
             /** @type {Y.XmlFragment} */ (rightY),
             /** @type {PModel.Node} */ (rightP),
-            mapping
+            mapping,
+            rightProof
           )
           right += 1
         } else {

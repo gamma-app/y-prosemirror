@@ -122,6 +122,15 @@ const prosemirrorView = new EditorView(document.querySelector('#editor'), {
 })
 ```
 
+When passing an externally owned `Y.UndoManager`, set
+`shouldDestroyUndoManager: false`. The plugin will detach its own stack-item
+listeners when the editor view is destroyed without destroying the borrowed
+manager.
+
+```js
+yUndoPlugin({ undoManager, shouldDestroyUndoManager: false })
+```
+
 #### Utilities
 
 The package includes a number of utility methods for converting back and forth between

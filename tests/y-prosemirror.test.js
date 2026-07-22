@@ -14,6 +14,7 @@ import {
   ySyncPlugin,
   ySyncPluginKey,
   yUndoPlugin,
+  yUndoPluginKey,
   yXmlFragmentToProsemirrorJSON
 } from '../src/y-prosemirror.js'
 import { EditorState, Plugin, TextSelection, NodeSelection } from 'prosemirror-state'
@@ -77,6 +78,82 @@ export const testPluginIntegrity = (_tc) => {
     viewUpdateEvents: 1,
     stateUpdateEvents: 1
   }, 'events are fired only once')
+}
+
+/**
+ * @param {t.TestCase} _tc
+ */
+export const testBorrowedUndoManagerLifecycle = (_tc) => {
+  const ydoc = new Y.Doc()
+  const fragment = ydoc.get('prosemirror', Y.XmlFragment)
+  const undoManager = new Y.UndoManager(fragment, {
+    trackedOrigins: new Set([ySyncPluginKey])
+  })
+  const removedListeners = []
+  const originalOff = undoManager.off.bind(undoManager)
+  undoManager.off = (eventName, listener) => {
+    removedListeners.push(eventName)
+    originalOff(eventName, listener)
+  }
+  let destroyCalls = 0
+  const originalDestroy = undoManager.destroy.bind(undoManager)
+  undoManager.destroy = () => {
+    destroyCalls++
+    originalDestroy()
+  }
+
+  const view = new EditorView(null, {
+    // @ts-ignore
+    state: EditorState.create({
+      schema,
+      plugins: [
+        ySyncPlugin(fragment),
+        yUndoPlugin({ undoManager, shouldDestroyUndoManager: false })
+      ]
+    })
+  })
+
+  view.destroy()
+
+  t.assert(destroyCalls === 0, 'borrowed undo manager is not destroyed')
+  t.compare(removedListeners.sort(), ['stack-item-added', 'stack-item-popped'])
+
+  ydoc.transact(() => {
+    fragment.push([new Y.XmlElement('paragraph')])
+  }, ySyncPluginKey)
+  t.assert(undoManager.canUndo(), 'borrowed undo manager remains active')
+
+  undoManager.destroy()
+  ydoc.destroy()
+}
+
+/**
+ * @param {t.TestCase} _tc
+ */
+export const testOwnedUndoManagerLifecycle = (_tc) => {
+  const ydoc = new Y.Doc()
+  const view = new EditorView(null, {
+    // @ts-ignore
+    state: EditorState.create({
+      schema,
+      plugins: [
+        ySyncPlugin(ydoc.get('prosemirror', Y.XmlFragment)),
+        yUndoPlugin()
+      ]
+    })
+  })
+  const undoManager = yUndoPluginKey.getState(view.state).undoManager
+  let destroyCalls = 0
+  const originalDestroy = undoManager.destroy.bind(undoManager)
+  undoManager.destroy = () => {
+    destroyCalls++
+    originalDestroy()
+  }
+
+  view.destroy()
+
+  t.assert(destroyCalls === 1, 'owned undo manager is destroyed')
+  ydoc.destroy()
 }
 
 /**

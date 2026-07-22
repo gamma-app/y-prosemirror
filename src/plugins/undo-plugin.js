@@ -29,7 +29,7 @@ export const defaultDeleteFilter = (item, protectedNodes) => !(item instanceof I
   (item.content.type instanceof XmlElement && protectedNodes.has(item.content.type.nodeName))) ||
 item.content.type._length === 0
 
-export const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOrigins = [], undoManager = null } = {}) => new Plugin({
+export const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOrigins = [], undoManager = null, shouldDestroyUndoManager = true } = {}) => new Plugin({
   key: yUndoPluginKey,
   state: {
     init: (initargs, state) => {
@@ -77,21 +77,27 @@ export const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOri
   view: view => {
     const ystate = ySyncPluginKey.getState(view.state)
     const undoManager = yUndoPluginKey.getState(view.state).undoManager
-    undoManager.on('stack-item-added', ({ stackItem }) => {
+    const handleStackItemAdded = ({ stackItem }) => {
       const binding = ystate.binding
       if (binding) {
         stackItem.meta.set(binding, yUndoPluginKey.getState(view.state).prevSel)
       }
-    })
-    undoManager.on('stack-item-popped', ({ stackItem }) => {
+    }
+    const handleStackItemPopped = ({ stackItem }) => {
       const binding = ystate.binding
       if (binding) {
         binding.beforeTransactionSelection = stackItem.meta.get(binding) || binding.beforeTransactionSelection
       }
-    })
+    }
+    undoManager.on('stack-item-added', handleStackItemAdded)
+    undoManager.on('stack-item-popped', handleStackItemPopped)
     return {
       destroy: () => {
-        undoManager.destroy()
+        undoManager.off('stack-item-added', handleStackItemAdded)
+        undoManager.off('stack-item-popped', handleStackItemPopped)
+        if (shouldDestroyUndoManager) {
+          undoManager.destroy()
+        }
       }
     }
   }

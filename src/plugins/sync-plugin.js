@@ -49,8 +49,7 @@ const safeReplace = (tr, from, to, parent, fromIndex, toIndex, insert) => {
     return false
   }
 
-  tr.step(new ReplaceStep(from, to, new PModel.Slice(insert, 0, 0)))
-  return true
+  return !tr.maybeStep(new ReplaceStep(from, to, new PModel.Slice(insert, 0, 0))).failed
 }
 
 /**
